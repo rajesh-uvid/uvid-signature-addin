@@ -1,0 +1,179 @@
+order: 1
+id: uvid-auto-signature
+name: UVID Auto Signature
+description: >-
+  Inserts a personalized UVID Consulting email signature. Fetches name, email,
+  job title, and phone from Microsoft Graph (M365 / Azure AD profile).
+  No SharePoint or employees.json required — uses SSO automatically.
+host: OUTLOOK
+api_set: {}
+script:
+  content: |
+    // ─────────────────────────────────────────────────────────────────
+    // UVID Consulting – Signature Snippet (Microsoft Graph version)
+    // Synced with commands.js logic.
+    //
+    // Fetches:  displayName → Name
+    //           mail        → Email
+    //           jobTitle    → Designation   (set in M365 Admin Center)
+    //           businessPhones / mobilePhone → Phone
+    //
+    // Falls back to Outlook profile values if Graph SSO is unavailable.
+    // ─────────────────────────────────────────────────────────────────
+
+    const BANNER_IMAGE_URL = "https://raw.githubusercontent.com/rajesh-uvid/uvid-signature-addin/refs/heads/main/assets/image/banner/banner.png";
+    const BANNER_LINK      = "https://www.uvidconsulting.com";
+    const BANNER_ALT       = "UVID Consulting";
+
+    Office.onReady(() => {
+      // Pre-fill name & email instantly from Outlook (no network call needed)
+      const profile = Office.context.mailbox.userProfile;
+      setField("nameField",  profile.displayName  || "");
+      setField("emailField", profile.emailAddress || "");
+
+      document.getElementById("insertBtn").addEventListener("click", insertSignature);
+      document.getElementById("fetchBtn").addEventListener("click", fetchFromGraph);
+
+      // Auto-fetch job title & phone from Graph on load
+      fetchFromGraph();
+    });
+
+    async function fetchFromGraph(): Promise<void> {
+      setStatus("Fetching your M365 profile...", "blue");
+      try {
+        // Silent SSO — no popup needed for signed-in M365 users
+        const token = await (OfficeRuntime as any).auth.getAccessToken({
+          allowSignInPrompt:  true,
+          allowConsentPrompt: true,
+          forMSGraphAccess:   true
+        });
+
+        const resp = await fetch(
+          "https://graph.microsoft.com/v1.0/me?$select=displayName,mail,userPrincipalName,jobTitle,businessPhones,mobilePhone",
+          { headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" } }
+        );
+
+        if (!resp.ok) throw new Error("Graph error: " + resp.status + " " + resp.statusText);
+
+        const me = await resp.json();
+
+        setField("nameField",   me.displayName || getField("nameField"));
+        setField("emailField",  me.mail || me.userPrincipalName || getField("emailField"));
+        setField("designation", me.jobTitle || "");
+        setField("phone",       (me.businessPhones && me.businessPhones[0]) || me.mobilePhone || "");
+
+        setStatus("Profile loaded from M365!", "green");
+      } catch (err) {
+        // Outlook profile values remain pre-filled; user can add designation & phone manually
+        console.warn("Graph fetch failed:", err);
+        setStatus("Graph unavailable. Name & email pre-filled. Add designation & phone manually.", "#cc6600");
+      }
+    }
+
+    function insertSignature(): void {
+      const name        = getField("nameField").trim();
+      const email       = getField("emailField").trim();
+      const designation = getField("designation").trim() || "Consultant";
+      const phone       = getField("phone").trim();
+
+      if (!name || !email) { setStatus("Name and email are required.", "orange"); return; }
+
+      setStatus("Inserting signature...", "blue");
+
+      const phoneHtml = phone
+        ? "<span>&#128222; " + esc(phone) + "</span> &nbsp;|&nbsp; "
+        : "";
+
+      const signatureHtml = [
+        "<br/><br/>",
+        "<div style=\"font-family:'Segoe UI',Arial,sans-serif;font-size:10pt;color:#444;border-top:2px solid #005A9E;padding-top:10px;\">",
+          "<p style=\"margin:0 0 2px 0;\"><strong style=\"font-size:11pt;\">" + esc(name) + "</strong></p>",
+          "<p style=\"margin:0 0 2px 0;color:#005A9E;font-weight:600;\">" + esc(designation) + " | UVID Consulting</p>",
+          "<p style=\"margin:0 0 2px 0;\">" + phoneHtml + "<a href=\"mailto:" + esc(email) + "\" style=\"color:#005A9E;\">" + esc(email) + "</a></p>",
+          "<p style=\"margin:10px 0 0 0;\">",
+            "<a href=\"" + BANNER_LINK + "\" target=\"_blank\">",
+              "<img src=\"" + BANNER_IMAGE_URL + "\" alt=\"" + BANNER_ALT + "\" width=\"450\"",
+              " style=\"max-width:450px;height:auto;display:block;border-radius:4px;\"/>",
+            "</a>",
+          "</p>",
+        "</div>"
+      ].join("");
+
+      Office.context.mailbox.item.body.setSignatureAsync(
+        signatureHtml,
+        { coercionType: Office.CoercionType.Html },
+        (result) => {
+          if (result.status === Office.AsyncResultStatus.Succeeded) {
+            setStatus("Signature inserted!", "green");
+          } else {
+            setStatus("Error: " + result.error.message, "red");
+          }
+        }
+      );
+    }
+
+    // ── Shared utilities (same logic as commands.js) ──────────────────
+    function esc(s: string): string {
+      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+    function getField(id: string): string {
+      return ((document.getElementById(id) as HTMLInputElement) || {value: ""}).value;
+    }
+    function setField(id: string, val: string): void {
+      const el = document.getElementById(id) as HTMLInputElement;
+      if (el) el.value = val;
+    }
+    function setStatus(msg: string, color: string): void {
+      const el = document.getElementById("status") as HTMLElement;
+      if (el) { el.textContent = msg; el.style.color = color; }
+    }
+  language: typescript
+template:
+  content: |
+    <section style="padding:14px;font-family:'Segoe UI',sans-serif;">
+
+      <h2 style="color:#005A9E;font-size:15px;margin:0 0 2px;">UVID Auto Signature</h2>
+      <p style="color:#888;font-size:11px;margin:0 0 12px;">
+        Auto-filled from your M365 profile. Edit any field if needed, then click Insert.
+      </p>
+
+      <label style="font-size:11px;font-weight:700;display:block;margin-bottom:2px;">Full Name</label>
+      <input id="nameField" type="text" placeholder="Jane Smith"
+        style="width:100%;padding:7px 8px;margin-bottom:9px;border:1px solid #ccc;border-radius:4px;font-size:13px;box-sizing:border-box;"/>
+
+      <label style="font-size:11px;font-weight:700;display:block;margin-bottom:2px;">Email</label>
+      <input id="emailField" type="email" placeholder="jane@uvidconsulting.com"
+        style="width:100%;padding:7px 8px;margin-bottom:9px;border:1px solid #ccc;border-radius:4px;font-size:13px;box-sizing:border-box;"/>
+
+      <label style="font-size:11px;font-weight:700;display:block;margin-bottom:2px;">Designation / Job Title</label>
+      <input id="designation" type="text" placeholder="e.g. Software Developer Trainee"
+        style="width:100%;padding:7px 8px;margin-bottom:9px;border:1px solid #ccc;border-radius:4px;font-size:13px;box-sizing:border-box;"/>
+
+      <label style="font-size:11px;font-weight:700;display:block;margin-bottom:2px;">Phone Number</label>
+      <input id="phone" type="tel" placeholder="+91 00000 00000"
+        style="width:100%;padding:7px 8px;margin-bottom:14px;border:1px solid #ccc;border-radius:4px;font-size:13px;box-sizing:border-box;"/>
+
+      <button id="fetchBtn"
+        style="background:#fff;color:#005A9E;border:1.5px solid #005A9E;padding:8px;font-size:13px;font-weight:600;border-radius:4px;cursor:pointer;width:100%;margin-bottom:8px;">
+        &#8635;&nbsp; Re-fetch from M365 Profile
+      </button>
+
+      <button id="insertBtn"
+        style="background:#005A9E;color:#fff;border:none;padding:10px;font-size:14px;font-weight:600;border-radius:4px;cursor:pointer;width:100%;">
+        &#9654;&nbsp; Insert My Signature
+      </button>
+
+      <div id="status" style="margin-top:12px;font-size:12px;font-weight:700;min-height:18px;"></div>
+    </section>
+  language: html
+style:
+  content: |
+    body { margin: 0; }
+    #insertBtn:hover { background: #004578 !important; }
+    #fetchBtn:hover  { background: #EFF6FC !important; }
+    input:focus { outline: 2px solid #005A9E; border-color: #005A9E; }
+  language: css
+libraries: |
+  https://appsforoffice.microsoft.com/lib/1/hosted/office.js
+  @types/office-js
+  office-runtime

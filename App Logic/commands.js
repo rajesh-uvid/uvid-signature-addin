@@ -1,90 +1,134 @@
 /*
  * UVID Consulting - Background Signature Logic
- * Hosted on OneDrive via public link.
+ * Fetches user profile (job title, phone) from Microsoft Graph API via SSO.
+ * No employees.json required — data comes directly from M365 / Azure AD.
+ *
+ * SETUP REQUIRED:
+ *   1. Register an Azure AD app at https://portal.azure.com > App registrations
+ *   2. Grant the app "User.Read" delegated permission (Microsoft Graph)
+ *   3. Replace YOUR_AZURE_APP_ID in manifest.xml WebApplicationInfo
  */
 
-// Define SharePoint URLs (Private to org)
-// IMPORTANT: Update these to the actual raw file paths on your SharePoint site.
-const SHAREPOINT_EMPLOYEES_URL = "https://key65akcdgsfg2zhwxauifkam1a.sharepoint.com/:u:/s/UVIDEmailSignature/IQDv-trekFKmQaYKrONKww9yAZegYOKOKBX3JoyXASLrYns?e=x0Fc5t";
-const SHAREPOINT_BANNER_CONFIG_URL = "https://key65akcdgsfg2zhwxauifkam1a.sharepoint.com/:u:/s/UVIDEmailSignature/IQBdttIVb3lpQZBIl0xmZI4HAf32nZfDPjyfiU5LCYajX6c";
+// Banner configuration — update these if the banner changes
+const BANNER_IMAGE_URL  = "https://raw.githubusercontent.com/rajesh-uvid/uvid-signature-addin/refs/heads/main/assets/image/banner/banner.png";
+const BANNER_LINK       = "https://www.uvidconsulting.com";
+const BANNER_ALT        = "UVID Consulting";
 
 Office.onReady(() => {
     // Add-in initialized
 });
 
 /**
- * Handles the OnNewMessageCompose event.
- * Triggered automatically when a user clicks "New Email".
+ * Handles the OnNewMessageCompose / OnNewAppointmentOrganizer events.
+ * Triggered automatically when the user clicks "New Email" or "New Meeting".
  */
 async function onMessageComposeHandler(event) {
     try {
-        // 1. Get identity from Outlook profile (instant, zero auth)
-        const userProfile = Office.context.mailbox.userProfile;
-        const email = userProfile.emailAddress;
-        const name = userProfile.displayName;
+        // ── Step 1: Get SSO token silently via OfficeRuntime ────────────
+        // No popup needed — user is already signed in to M365.
+        let accessToken;
+        try {
+            accessToken = await OfficeRuntime.auth.getAccessToken({
+                allowSignInPrompt:  true,
+                allowConsentPrompt: true,
+                forMSGraphAccess:   true
+            });
+        } catch (tokenErr) {
+            console.error("SSO token error:", tokenErr);
+            // Fallback: insert a generic signature if SSO fails
+            await insertGenericSignature(event);
+            return;
+        }
 
-        // Fetch options: 'include' credentials to use the user's existing M365 session cookies for SharePoint
-        const fetchOptions = { credentials: 'include', cache: 'no-store' };
-
-        // 2. Fetch employee data from SharePoint
-        const empResponse = await fetch(SHAREPOINT_EMPLOYEES_URL, fetchOptions);
-        const employeesList = await empResponse.json();
-
-        // Find current user's details, fallback to generic if not found
-        const employeeData = employeesList.find(e => e.email.toLowerCase() === email.toLowerCase()) || {
-            designation: "Consultant",
-            phone: "+1 000 000 0000"
-        };
-
-        // 3. Fetch banner config
-        const bannerResponse = await fetch(SHAREPOINT_BANNER_CONFIG_URL, fetchOptions);
-        const bannerConfig = await bannerResponse.json();
-
-        // 4. Fetch the actual banner image and base64 encode it 
-        // This freezes the image inside the email so old campaigns don't bleed into old emails
-        const imgResponse = await fetch(bannerConfig.banner_image_url, fetchOptions);
-        const imageBlob = await imgResponse.blob();
-
-        const base64Image = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(imageBlob);
-        });
-
-        // 5. Construct the HTML Signature
-        const signatureHtml = `
-            <br/><br/>
-            <div style="font-family: 'Segoe UI', Arial, sans-serif; font-size: 10pt; color: #444;">
-                <p style="margin: 0; padding: 0;"><strong>${name}</strong></p>
-                <p style="margin: 0; padding: 0; color: #005A9E;">${employeeData.designation} | UVID Consulting</p>
-                <p style="margin: 0; padding: 0;">M: ${employeeData.phone} | E: <a href="mailto:${email}" style="color: #005A9E;">${email}</a></p>
-                <p style="margin-top: 10px;">
-                    <a href="${bannerConfig.target_link}">
-                        <img src="${base64Image}" alt="${bannerConfig.alt_text}" style="max-width: 450px; height: auto; border-radius: 4px;"/>
-                    </a>
-                </p>
-            </div>
-        `;
-
-        // 6. Insert into Outlook
-        Office.context.mailbox.item.body.setSignatureAsync(
-            signatureHtml,
-            { coercionType: Office.CoercionType.Html },
-            function (asyncResult) {
-                if (asyncResult.status === Office.AsyncResultStatus.Failed) {
-                    console.error("Signature injection failed: " + asyncResult.error.message);
+        // ── Step 2: Fetch profile from Microsoft Graph /me ───────────────
+        // Gets: displayName, mail, jobTitle, businessPhones, mobilePhone
+        const graphResponse = await fetch(
+            "https://graph.microsoft.com/v1.0/me?$select=displayName,mail,userPrincipalName,jobTitle,businessPhones,mobilePhone",
+            {
+                headers: {
+                    "Authorization": `Bearer ${accessToken}`,
+                    "Content-Type":  "application/json"
                 }
-                // Inform Outlook the event is complete, allowing the user to type
-                event.completed({ allowEvent: true });
             }
         );
+
+        if (!graphResponse.ok) {
+            throw new Error(`Graph API error: ${graphResponse.status}`);
+        }
+
+        const profile = await graphResponse.json();
+
+        const name        = profile.displayName                              || Office.context.mailbox.userProfile.displayName;
+        const email       = profile.mail || profile.userPrincipalName       || Office.context.mailbox.userProfile.emailAddress;
+        const designation = profile.jobTitle                                 || "Consultant";
+        const phone       = (profile.businessPhones && profile.businessPhones[0])
+                            || profile.mobilePhone                          || "";
+
+        // ── Step 3: Build and insert the HTML signature ──────────────────
+        await insertSignature(event, name, email, designation, phone);
+
     } catch (error) {
-        console.error("Error generating UVID signature: ", error);
-        // Fail gracefully, ensure the user can still write their email
+        console.error("Error generating UVID signature:", error);
+        // Fail gracefully — user can still write and send email
         event.completed({ allowEvent: true });
     }
 }
 
-// Map the function so the manifest can find it
+/**
+ * Builds and injects the HTML signature into the compose window.
+ */
+async function insertSignature(event, name, email, designation, phone) {
+    const phoneHtml = phone
+        ? `<span>&#128222; ${esc(phone)}</span> &nbsp;|&nbsp; ` : "";
+
+    const signatureHtml = `
+        <br/><br/>
+        <div style="font-family:'Segoe UI',Arial,sans-serif;font-size:10pt;color:#444;border-top:2px solid #005A9E;padding-top:10px;">
+            <p style="margin:0 0 2px 0;"><strong style="font-size:11pt;">${esc(name)}</strong></p>
+            <p style="margin:0 0 2px 0;color:#005A9E;font-weight:600;">${esc(designation)} | UVID Consulting</p>
+            <p style="margin:0 0 2px 0;">
+                ${phoneHtml}<a href="mailto:${esc(email)}" style="color:#005A9E;">${esc(email)}</a>
+            </p>
+            <p style="margin:10px 0 0 0;">
+                <a href="${BANNER_LINK}" target="_blank">
+                    <img src="${BANNER_IMAGE_URL}"
+                         alt="${BANNER_ALT}"
+                         width="450"
+                         style="max-width:450px;height:auto;display:block;border-radius:4px;"/>
+                </a>
+            </p>
+        </div>
+    `;
+
+    Office.context.mailbox.item.body.setSignatureAsync(
+        signatureHtml,
+        { coercionType: Office.CoercionType.Html },
+        function (asyncResult) {
+            if (asyncResult.status === Office.AsyncResultStatus.Failed) {
+                console.error("Signature injection failed:", asyncResult.error.message);
+            }
+            event.completed({ allowEvent: true });
+        }
+    );
+}
+
+/**
+ * Fallback: insert a minimal signature using only the Outlook profile
+ * (no Graph API — name and email only, no designation or phone).
+ */
+async function insertGenericSignature(event) {
+    const profile = Office.context.mailbox.userProfile;
+    await insertSignature(event, profile.displayName, profile.emailAddress, "UVID Consulting", "");
+}
+
+/** Prevent XSS when interpolating user data into HTML */
+function esc(str) {
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
+// Map the handler so the manifest LaunchEvent can find it
 Office.actions.associate("onMessageComposeHandler", onMessageComposeHandler);
