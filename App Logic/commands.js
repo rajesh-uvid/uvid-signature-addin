@@ -10,7 +10,7 @@
  */
 
 // Banner configuration — update these if the banner changes
-const BANNER_IMAGE_URL  = "https://raw.githubusercontent.com/rajesh-uvid/uvid-signature-addin/refs/heads/main/assets/image/banner/banner.png";
+const BANNER_IMAGE_URL  = "https://rajesh-uvid.github.io/uvid-signature-addin/assets/image/banner/banner.png";
 const BANNER_LINK       = "https://www.uvidconsulting.com";
 const BANNER_ALT        = "UVID Consulting";
 
