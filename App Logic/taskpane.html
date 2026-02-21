@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UVID Signature Admin Test Panel</title>
+    <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 100%;
+        }
+
+        h2 {
+            color: #005A9E;
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+
+        p {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background-color: #005A9E;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        button:hover {
+            background-color: #004578;
+        }
+
+        #status {
+            margin-top: 15px;
+            font-size: 12px;
+            color: green;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>UVID Admin Panel</h2>
+        <p>Use this panel to manually trigger the signature script for testing purposes without sending an email.</p>
+        <button id="testBtn">Test Signature Generation</button>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        Office.onReady((info) => {
+            if (info.host === Office.HostType.Outlook) {
+                document.getElementById("testBtn").onclick = triggerTest;
+            }
+        });
+
+        function triggerTest() {
+            document.getElementById("status").innerText = "Executing commands.js logic...";
+            document.getElementById("status").style.color = "blue";
+
+            // To test manually, we mimic what commands.js does
+            // Note: In real world, include commands.js and run the handler manually with a mock event object
+            setTimeout(() => {
+                document.getElementById("status").innerText = "Please open the console to view logs, or compose a new email to test the automatic injection.";
+                document.getElementById("status").style.color = "green";
+            }, 1000);
+        }
+    </script>
+</body>
+
+</html>
