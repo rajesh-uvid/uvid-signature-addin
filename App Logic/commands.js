@@ -3,16 +3,22 @@
  * Fetches user profile (job title, phone) from Microsoft Graph API via SSO.
  * No employees.json required — data comes directly from M365 / Azure AD.
  *
+ * AZURE TENANT: 666ce4e4-0e70-42c4-bf70-cf444455f075
+ *
  * SETUP REQUIRED:
  *   1. Register an Azure AD app at https://portal.azure.com > App registrations
+ *      (Tenant: 666ce4e4-0e70-42c4-bf70-cf444455f075)
  *   2. Grant the app "User.Read" delegated permission (Microsoft Graph)
- *   3. Replace YOUR_AZURE_APP_ID in manifest.xml WebApplicationInfo
+ *   3. Add an "Expose an API" scope with URI:
+ *      api://rajesh-uvid.github.io/uvid-signature-addin/666ce4e4-0e70-42c4-bf70-cf444455f075/<YOUR_APP_CLIENT_ID>
+ *   4. Replace YOUR_AZURE_APP_CLIENT_ID in manifest.xml WebApplicationInfo
+ *      with the Application (client) ID from the App registrations > Overview page.
  */
 
 // Banner configuration — update these if the banner changes
-const BANNER_IMAGE_URL  = "https://rajesh-uvid.github.io/uvid-signature-addin/assets/image/banner/banner.png";
-const BANNER_LINK       = "https://www.uvidconsulting.com";
-const BANNER_ALT        = "UVID Consulting";
+const BANNER_IMAGE_URL = "https://rajesh-uvid.github.io/uvid-signature-addin/assets/image/banner/banner.png";
+const BANNER_LINK = "https://www.uvidconsulting.com";
+const BANNER_ALT = "UVID Consulting";
 
 Office.onReady(() => {
     // Add-in initialized
@@ -29,9 +35,9 @@ async function onMessageComposeHandler(event) {
         let accessToken;
         try {
             accessToken = await OfficeRuntime.auth.getAccessToken({
-                allowSignInPrompt:  true,
+                allowSignInPrompt: true,
                 allowConsentPrompt: true,
-                forMSGraphAccess:   true
+                forMSGraphAccess: true
             });
         } catch (tokenErr) {
             console.error("SSO token error:", tokenErr);
@@ -47,7 +53,7 @@ async function onMessageComposeHandler(event) {
             {
                 headers: {
                     "Authorization": `Bearer ${accessToken}`,
-                    "Content-Type":  "application/json"
+                    "Content-Type": "application/json"
                 }
             }
         );
@@ -58,11 +64,11 @@ async function onMessageComposeHandler(event) {
 
         const profile = await graphResponse.json();
 
-        const name        = profile.displayName                              || Office.context.mailbox.userProfile.displayName;
-        const email       = profile.mail || profile.userPrincipalName       || Office.context.mailbox.userProfile.emailAddress;
-        const designation = profile.jobTitle                                 || "Consultant";
-        const phone       = (profile.businessPhones && profile.businessPhones[0])
-                            || profile.mobilePhone                          || "";
+        const name = profile.displayName || Office.context.mailbox.userProfile.displayName;
+        const email = profile.mail || profile.userPrincipalName || Office.context.mailbox.userProfile.emailAddress;
+        const designation = profile.jobTitle || "Consultant";
+        const phone = (profile.businessPhones && profile.businessPhones[0])
+            || profile.mobilePhone || "";
 
         // ── Step 3: Build and insert the HTML signature ──────────────────
         await insertSignature(event, name, email, designation, phone);

@@ -105,18 +105,20 @@
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GroupName" DefaultValue="UVID Signature" />
-        <bt:String id="BtnLabel"  DefaultValue="Admin Test Panel" />
-        <bt:String id="AppDesc"   DefaultValue="Automatically inserts a personalized company signature." />
+        <bt:String id="BtnLabel"  DefaultValue="Add Signature" />
+        <bt:String id="AppDesc"   DefaultValue="Insert a personalized UVID company signature into your email." />
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="BtnTooltip" DefaultValue="Open the admin testing panel for the signature add-in." />
+        <bt:String id="BtnTooltip" DefaultValue="Click to insert your personalized UVID signature into this email." />
       </bt:LongStrings>
     </Resources>
 
     <!--
       VersionOverrides 1.1 — nested inside 1.0 (modern Outlook / event-based activation).
-      NOTE: WebApplicationInfo for SSO will be added here once you register your
-      Azure AD app. See commands.js for setup instructions.
+      Azure AD Tenant: 666ce4e4-0e70-42c4-bf70-cf444455f075
+      WebApplicationInfo below enables SSO via OfficeRuntime.auth.getAccessToken().
+      Replace YOUR_AZURE_APP_CLIENT_ID with the Application (client) ID from your
+      Azure AD app registration (portal.azure.com > App registrations).
     -->
     <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
       <Description resid="AppDesc" />
@@ -127,19 +129,12 @@
         </bt:Sets>
       </Requirements>
 
+
       <Hosts>
         <Host xsi:type="MailHost">
-
-          <!-- Runtime for event-based activation -->
-          <Runtimes>
-            <Runtime resid="Commands.Url">
-              <Override type="javascript" resid="Commands.Js" />
-            </Runtime>
-          </Runtimes>
-
           <DesktopFormFactor>
 
-            <!-- Taskpane button in compose ribbon -->
+            <!-- Taskpane button in compose ribbon — user clicks to insert signature -->
             <ExtensionPoint xsi:type="MessageComposeCommandSurface">
               <OfficeTab id="TabDefault">
                 <Group id="msgComposeGroup11">
@@ -161,15 +156,6 @@
                   </Control>
                 </Group>
               </OfficeTab>
-            </ExtensionPoint>
-
-            <!-- Auto-insert signature on new compose / new appointment -->
-            <ExtensionPoint xsi:type="LaunchEvent">
-              <LaunchEvents>
-                <LaunchEvent Type="OnNewMessageCompose"      FunctionName="onMessageComposeHandler" />
-                <LaunchEvent Type="OnNewAppointmentOrganizer" FunctionName="onMessageComposeHandler" />
-              </LaunchEvents>
-              <SourceLocation resid="Commands.Url" />
             </ExtensionPoint>
 
           </DesktopFormFactor>
@@ -196,6 +182,23 @@
           <bt:String id="BtnTooltip" DefaultValue="Open the admin testing panel for the signature add-in." />
         </bt:LongStrings>
       </Resources>
+
+      <!--
+        SSO configuration — links this add-in to your Azure AD app registration.
+        <Id>         = Azure App (Client) ID (from App registrations > Overview)
+        <Resource>   = The API permission scope URI with tenant embedded.
+        <Scopes>     = Microsoft Graph delegated permissions needed.
+        Replace YOUR_AZURE_APP_CLIENT_ID with the real Application (client) ID GUID.
+      -->
+      <WebApplicationInfo>
+        <Id>36840c58-eaf2-4911-9c15-1d4505435c9d</Id>
+        <Resource>api://rajesh-uvid.github.io/uvid-signature-addin/36840c58-eaf2-4911-9c15-1d4505435c9d</Resource>
+        <Scopes>
+          <Scope>User.Read</Scope>
+          <Scope>openid</Scope>
+          <Scope>profile</Scope>
+        </Scopes>
+      </WebApplicationInfo>
 
     </VersionOverrides>
     <!-- End VersionOverrides 1.1 -->

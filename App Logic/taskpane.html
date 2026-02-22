@@ -4,80 +4,110 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UVID Signature Admin Test Panel</title>
+    <title>UVID Signature</title>
     <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+    <script type="text/javascript" src="https://rajesh-uvid.github.io/uvid-signature-addin/App%20Logic/commands.js"></script>
     <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding: 20px;
+            padding: 24px 20px;
             color: #333;
-        }
-
-        .container {
-            max-width: 100%;
+            background: #fff;
         }
 
         h2 {
             color: #005A9E;
-            font-size: 18px;
-            margin-bottom: 5px;
+            font-size: 17px;
+            margin-bottom: 8px;
         }
 
         p {
             font-size: 13px;
             color: #666;
-            margin-bottom: 20px;
+            margin-bottom: 22px;
+            line-height: 1.5;
         }
 
         button {
             background-color: #005A9E;
             color: white;
             border: none;
-            padding: 10px 15px;
+            padding: 11px 15px;
             font-size: 14px;
+            font-family: inherit;
             border-radius: 4px;
             cursor: pointer;
             width: 100%;
+            transition: background-color 0.15s;
         }
 
-        button:hover {
-            background-color: #004578;
-        }
+        button:hover { background-color: #004578; }
+        button:disabled { background-color: #999; cursor: not-allowed; }
 
         #status {
-            margin-top: 15px;
+            margin-top: 16px;
             font-size: 12px;
-            color: green;
-            font-weight: bold;
+            font-weight: 600;
+            min-height: 20px;
         }
+
+        .status-ok    { color: #107C10; }
+        .status-err   { color: #A80000; }
+        .status-info  { color: #005A9E; }
     </style>
 </head>
 
 <body>
-    <div class="container">
-        <h2>UVID Admin Panel</h2>
-        <p>Use this panel to manually trigger the signature script for testing purposes without sending an email.</p>
-        <button id="testBtn">Test Signature Generation</button>
+    <div>
+        <h2>UVID Signature</h2>
+        <p>Click the button below to insert your personalized UVID Consulting signature into this email.</p>
+        <button id="insertBtn">✍️ Add Signature</button>
         <div id="status"></div>
     </div>
 
     <script>
         Office.onReady((info) => {
             if (info.host === Office.HostType.Outlook) {
-                document.getElementById("testBtn").onclick = triggerTest;
+                document.getElementById("insertBtn").onclick = insertSignatureNow;
             }
         });
 
-        function triggerTest() {
-            document.getElementById("status").innerText = "Executing commands.js logic...";
-            document.getElementById("status").style.color = "blue";
+        async function insertSignatureNow() {
+            const btn = document.getElementById("insertBtn");
+            const status = document.getElementById("status");
 
-            // To test manually, we mimic what commands.js does
-            // Note: In real world, include commands.js and run the handler manually with a mock event object
-            setTimeout(() => {
-                document.getElementById("status").innerText = "Please open the console to view logs, or compose a new email to test the automatic injection.";
-                document.getElementById("status").style.color = "green";
-            }, 1000);
+            btn.disabled = true;
+            btn.textContent = "Inserting…";
+            status.className = "status-info";
+            status.textContent = "Fetching your profile…";
+
+            // Create a mock event object that satisfies event.completed()
+            const mockEvent = {
+                completed: function (options) {
+                    btn.disabled = false;
+                    btn.textContent = "✍️ Add Signature";
+
+                    if (options && options.allowEvent === false) {
+                        status.className = "status-err";
+                        status.textContent = "❌ Signature could not be inserted.";
+                    } else {
+                        status.className = "status-ok";
+                        status.textContent = "✅ Signature inserted successfully!";
+                    }
+                }
+            };
+
+            try {
+                await onMessageComposeHandler(mockEvent);
+            } catch (err) {
+                btn.disabled = false;
+                btn.textContent = "✍️ Add Signature";
+                status.className = "status-err";
+                status.textContent = "❌ Error: " + err.message;
+                console.error("Signature insert error:", err);
+            }
         }
     </script>
 </body>
