@@ -84,23 +84,17 @@ async function onMessageComposeHandler(event) {
  * Builds and injects the HTML signature into the compose window.
  */
 async function insertSignature(event, name, email, designation, phone) {
-    const phoneHtml = phone
-        ? `<span>&#128222; ${esc(phone)}</span> &nbsp;|&nbsp; ` : "";
+    const phoneHtml = phone ? `M: ${esc(phone)} | ` : "";
 
     const signatureHtml = `
         <br/><br/>
-        <div style="font-family:'Segoe UI',Arial,sans-serif;font-size:10pt;color:#444;border-top:2px solid #005A9E;padding-top:10px;">
-            <p style="margin:0 0 2px 0;"><strong style="font-size:11pt;">${esc(name)}</strong></p>
-            <p style="margin:0 0 2px 0;color:#005A9E;font-weight:600;">${esc(designation)} | UVID Consulting</p>
-            <p style="margin:0 0 2px 0;">
-                ${phoneHtml}<a href="mailto:${esc(email)}" style="color:#005A9E;">${esc(email)}</a>
-            </p>
-            <p style="margin:10px 0 0 0;">
-                <a href="${BANNER_LINK}" target="_blank">
-                    <img src="${BANNER_IMAGE_URL}"
-                         alt="${BANNER_ALT}"
-                         width="450"
-                         style="max-width:450px;height:auto;display:block;border-radius:4px;"/>
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; font-size: 10pt; color: #444;">
+            <p style="margin: 0; padding: 0;"><strong>${esc(name)}</strong></p>
+            <p style="margin: 0; padding: 0; color: #005A9E;">${esc(designation)} | UVID Consulting</p>
+            <p style="margin: 0; padding: 0;">${phoneHtml}E: <a href="mailto:${esc(email)}" style="color: #005A9E;">${esc(email)}</a></p>
+            <p style="margin-top: 10px;">
+                <a href="${BANNER_LINK}">
+                    <img src="${BANNER_IMAGE_URL}" alt="${BANNER_ALT}" style="max-width: 450px; height: auto; border-radius: 4px;"/>
                 </a>
             </p>
         </div>
