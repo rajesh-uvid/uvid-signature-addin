@@ -32,9 +32,9 @@ async function onMessageComposeHandler(event) {
     try {
         // ── Step 1: Get SSO token silently via OfficeRuntime ────────────
         // No popup needed — user is already signed in to M365.
-        let accessToken;
         try {
-            accessToken = await OfficeRuntime.auth.getAccessToken({
+            // Use Office.auth.getAccessToken which is the standard for Outlook SSO
+            accessToken = await Office.auth.getAccessToken({
                 allowSignInPrompt: true,
                 allowConsentPrompt: true,
                 forMSGraphAccess: true

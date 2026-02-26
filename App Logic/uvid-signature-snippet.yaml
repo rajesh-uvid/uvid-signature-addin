@@ -42,7 +42,7 @@ script:
       setStatus("Fetching your M365 profile...", "blue");
       try {
         // Silent SSO — no popup needed for signed-in M365 users
-        const token = await (OfficeRuntime as any).auth.getAccessToken({
+        const token = await Office.auth.getAccessToken({
           allowSignInPrompt:  true,
           allowConsentPrompt: true,
           forMSGraphAccess:   true

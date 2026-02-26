@@ -129,10 +129,19 @@
         </bt:Sets>
       </Requirements>
 
-
       <Hosts>
         <Host xsi:type="MailHost">
           <DesktopFormFactor>
+            <!-- LaunchEvent triggers for automatic execution -->
+            <ExtensionPoint xsi:type="LaunchEvent">
+              <LaunchEvents>
+                <LaunchEvent Type="OnNewMessageCompose" FunctionName="onMessageComposeHandler" />
+                <LaunchEvent Type="OnMessageReplyCreated" FunctionName="onMessageComposeHandler" />
+                <LaunchEvent Type="OnMessageForwardCreated" FunctionName="onMessageComposeHandler" />
+                <LaunchEvent Type="OnNewAppointmentOrganizer" FunctionName="onMessageComposeHandler" />
+              </LaunchEvents>
+              <SourceLocation resid="Commands.Url" />
+            </ExtensionPoint>
 
             <!-- Taskpane button in compose ribbon — user clicks to insert signature -->
             <ExtensionPoint xsi:type="MessageComposeCommandSurface">
